@@ -12,78 +12,51 @@ metadata:
 
 将白名单内粉圈账号的当日微博动态进行去噪、聚类、代表帖筛选与高保真摘要，输出极致紧凑的 Markdown 日报到当前对话。
 
-## 安装流程（首次运行必须按序执行）
+## 运行
 
-首次触发本 Skill 时，Agent 必须按以下三步走完，任何一步失败都不要继续往下。
-
-### Step 1: 依赖确认与安装
-
-Agent 逐项检查以下依赖，缺什么装什么：
-
-**1.1 Python 3**
-```bash
-python3 --version
-```
-- 有 → 通过，记下版本号
-- 没有 → macOS 执行 `brew install python3`，Linux 执行 `sudo apt install python3`，装完重新检查
-- 装不上 → 报告给用户，终止
-
-**1.2 mcporter**
-```bash
-mcporter --version
-```
-- 有 → 通过
-- 没有 → `npm install -g mcporter`，装完重新检查
-- 装不上 → 报告给用户，终止
-
-**1.3 weibo MCP**
-```bash
-mcporter list 2>&1 | grep -i weibo
-```
-- 能看到 `weibo (N tools, ...)` → 通过
-- 没有 → Agent 无法自动注册 MCP server，告诉用户需要手动配置 weibo MCP（参考 `references/weibo-fetch.md`），终止
-
-全部通过后，进入 Step 2。
-
-### Step 2: MVP 冒烟测试
-
-用一条最简单的调用验证整条链路是通的：
-
-```bash
-mcporter call "weibo.get_feeds(uid: 7051114584, limit: 1)"
-```
-
-**判断逻辑：**
-- 返回 JSON 数组（哪怕是空 `[]`）→ ✅ 链路通，进入 Step 3
-- 返回错误信息 → 查 `references/weibo-fetch.md` 的"已知问题"一节，看能否对应上
-  - 能对应 → 按文档里的修复方式处理，然后重跑冒烟测试
-  - 不能对应 → 把完整错误信息原样输出给用户，说"冒烟测试失败，以下是错误信息，我无法自动修复，请检查 MCP 配置"，终止
-- 命令超时（>30s）→ 告知用户网络可能有问题，终止
-
-### Step 3: 抓取当天数据
-
-冒烟测试通过后，直接执行正式抓取：
+直接执行抓取脚本：
 
 ```bash
 python3 scripts/fetch_feeds.py
 ```
 
-不传 `--date` 时默认取昨天数据。如果用户指定了日期：
+不传 `--date` 时默认取昨天数据。指定日期：
 
 ```bash
 python3 scripts/fetch_feeds.py --date "YYYY-MM-DD"
 ```
 
-脚本会逐账号调用微博 API，账号间间隔 10s 防限流，10 个账号大约需要 100 秒。
+只抓某一组：
 
-**判断逻辑：**
-- 拿到数据（即使只有少量帖子）→ 进入 Step 4 做 Agent 侧分析
-- 拿到空数组 `[]` → 告知用户"目标日期无数据"，可能是当天确实无发帖或微博限流
-- 脚本报错 → 把错误信息输出给用户，检查 `references/weibo-fetch.md`
+```bash
+python3 scripts/fetch_feeds.py --column "官方组"
+```
+
+脚本会逐账号调用微博 API，账号间间隔 10s 防限流，10 个账号大约需 100 秒。
+
+**脚本返回 JSON 数组后，Agent 直接进入分析流程（Step 2）。**
 
 ---
 
-## Agent 侧分析（Step 4）
+## 出错处理
+
+运行脚本后如果报错，按下面的表定位问题：
+
+| 报错信息 | 原因 | 处理 |
+|---------|------|------|
+| `python3: command not found` | Python 3 未安装 | macOS: `brew install python3`，Linux: `sudo apt install python3` |
+| `mcporter not found` 前缀 | mcporter 未安装或不在 PATH | `npm install -g mcporter`，装完确认 `which mcporter` 有输出 |
+| `Error: Whitelist file not found` | 脚本找不到白名单 JSON | 确认 `references/whitelist-zlh.json` 存在，或用 `--whitelist` 指定绝对路径 |
+| `weibo.get_feeds` 返回 error | weibo MCP 未注册或限流 |     先跑 `mcporter list \| grep weibo` 确认 weibo 已注册。如果没有，需要手动配置 weibo MCP server（参考 `references/weibo-fetch.md`）。如果已注册但仍报错，可能被限流，等几分钟后重试 |
+| `TimeoutExpired` | 单个账号请求超时 | 网络问题，重试即可 |
+| 返回 `[]` 空数组 | 目标日期无发帖或被限流 | 告知用户，换一个日期重试 |
+| `Invalid JSON response` | 微博 API 返回了非 JSON 内容 | 可能被限流，等几分钟后重试 |
+
+**原则：能装就装，装不上就把完整错误信息给用户，说清楚什么装不了、为什么、用户需要做什么。不要猜，不要假设依赖不在。**
+
+---
+
+## Agent 侧分析（Step 2）
 
 Agent 读取脚本输出的 JSON 数据，在自身认知中执行：
 
@@ -94,7 +67,7 @@ Agent 读取脚本输出的 JSON 数据，在自身认知中执行：
    - 过滤代表帖正文中的所有 `#话题名称#` 标签
    - 去除皇冠 Emoji `👑`
 
-## 输出排版（Step 5）
+## 输出排版（Step 3）
 
 Agent 按照**极致紧凑风格（终版极简）**输出到当前对话：
 
@@ -109,14 +82,10 @@ Agent 按照**极致紧凑风格（终版极简）**输出到当前对话：
 
 ---
 
-## 已知问题速查
+## 已知避坑
 
-| 现象 | 原因 | 处理 |
-|------|------|------|
-| `get_feeds` 返回 `[]` | 当前日期确实无发帖 | 告知用户，正常结束 |
-| `get_feeds` 返回 error / timeout | 微博限流或 MCP 配置问题 | 建议等几分钟后重试 |
-| `raw_text` 永远为空 | API 字段特性 | 使用脚本清洗后的 `text` 字段 |
-| 互动数在 `counts` 字典里 | API 文档与实际不符 | 脚本已修正，直接从根节点取 `attitudes_count` / `reposts_count` / `comments_count` |
-| 脚本报 `mcporter not found` | Python 子进程找不到 mcporter | 检查 mcporter 是否在 PATH 中，或用绝对路径 |
+1. **`raw_text` 永远为空**：脚本已将 HTML 标签清洗，使用 `text` 清洗后的纯文本。
+2. **Weibo 互动字段**：真实字段在根节点 `attitudes_count`（点赞）、`reposts_count`（转发）、`comments_count`（评论），不在嵌套的 `counts` 字典内。脚本已修正。
+3. **微博限流**：脚本已内置 10s 间隔，如仍被限流，返回空数据属正常，稍后重试。
 
 更多细节见 `references/weibo-fetch.md`。
