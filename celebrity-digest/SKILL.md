@@ -32,7 +32,13 @@ python3 scripts/fetch_feeds.py --date "YYYY-MM-DD"
 python3 scripts/fetch_feeds.py --column "官方组"
 ```
 
-脚本会逐账号调用微博 API，账号间间隔 10s 防限流，10 个账号大约需 100 秒。
+脚本默认使用 Jina Reader 方式抓取（无需登录，无需 mcporter）。如需使用 mcporter 方式：
+
+```bash
+python3 scripts/fetch_feeds.py --method mcporter
+```
+
+脚本会逐账号抓取，账号间间隔 3 秒（Jina）或 10 秒（mcporter）防限流。
 
 **脚本返回 JSON 数组后，Agent 直接进入分析流程（Step 2）。**
 
@@ -40,17 +46,15 @@ python3 scripts/fetch_feeds.py --column "官方组"
 
 ## 出错处理
 
-运行脚本后如果报错，按下面的表定位问题：
-
 | 报错信息 | 原因 | 处理 |
 |---------|------|------|
 | `python3: command not found` | Python 3 未安装 | macOS: `brew install python3`，Linux: `sudo apt install python3` |
-| `mcporter not found` 前缀 | mcporter 未安装或不在 PATH | `npm install -g mcporter`，装完确认 `which mcporter` 有输出 |
+| `HTTP Error 503` | Jina Reader 被限流 | 正常现象，等几分钟后重试 |
+| `HTTP Error 429` | 请求过于频繁 | 脚本已内置 3 秒间隔，如仍出现，等 1-2 分钟重试 |
 | `Error: Whitelist file not found` | 脚本找不到白名单 JSON | 确认 `references/whitelist-zlh.json` 存在，或用 `--whitelist` 指定绝对路径 |
-| `weibo.get_feeds` 返回 error | weibo MCP 未注册或限流 |     先跑 `mcporter list \| grep weibo` 确认 weibo 已注册。如果没有，需要手动配置 weibo MCP server（参考 `references/weibo-fetch.md`）。如果已注册但仍报错，可能被限流，等几分钟后重试 |
-| `TimeoutExpired` | 单个账号请求超时 | 网络问题，重试即可 |
-| 返回 `[]` 空数组 | 目标日期无发帖或被限流 | 告知用户，换一个日期重试 |
-| `Invalid JSON response` | 微博 API 返回了非 JSON 内容 | 可能被限流，等几分钟后重试 |
+| mcporter 方式返回 `[]` | weibo MCP 未发 Cookie（微博 API 432） | 改用默认的 Jina Reader 方式（`--method jina`），或配置微博 Cookie |
+| `mcporter not found` | mcporter 未安装 | 仅使用 `--method mcporter` 时需要。默认 Jina Reader 方式不需要 mcporter |
+| 大量账号返回空 | 微博限流 | 正常，换一个日期重试 |
 
 **原则：能装就装，装不上就把完整错误信息给用户，说清楚什么装不了、为什么、用户需要做什么。不要猜，不要假设依赖不在。**
 
@@ -86,6 +90,7 @@ Agent 按照**极致紧凑风格（终版极简）**输出到当前对话：
 
 1. **`raw_text` 永远为空**：脚本已将 HTML 标签清洗，使用 `text` 清洗后的纯文本。
 2. **Weibo 互动字段**：真实字段在根节点 `attitudes_count`（点赞）、`reposts_count`（转发）、`comments_count`（评论），不在嵌套的 `counts` 字典内。脚本已修正。
-3. **微博限流**：脚本已内置 10s 间隔，如仍被限流，返回空数据属正常，稍后重试。
+3. **微博限流**：Jina Reader 方式下偶尔 503 属正常，mcporter 方式下返回空数组可能因缺少 Cookie。推荐使用默认 Jina Reader 方式。
+4. **Jina Reader 字段差异**：Jina Reader 返回的帖子可能用 `like_count` 代替 `attitudes_count`、`mblog_text` 代替 `text`、`created_at_timestamp` 代替 `created_at`，脚本已统一处理。
 
 更多细节见 `references/weibo-fetch.md`。
