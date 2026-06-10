@@ -1,0 +1,22 @@
+{
+  "celebrity": "张凌赫",
+  "weibo_uid": 7051114584,
+  "version": "2026-06-04",
+  "verified_by": "weibo.get_feeds(uid, limit=1) > 0",
+  "accounts": [
+    {"uid": 7051114584, "screen_name": "张凌赫", "column": "官方组", "role": "本人"},
+    {"uid": 7831110265, "screen_name": "张凌赫工作室", "column": "官方组", "role": "工作室"},
+    {"uid": 6458278005, "screen_name": "张凌赫全球后援会", "column": "官方组", "role": "后援会总会"},
+    {"uid": 7870099666, "screen_name": "张凌赫网宣组", "column": "网宣组", "role": "网宣组"},
+    {"uid": 1905302841, "screen_name": "张凌赫后援会数据组", "column": "数据组", "role": "数据组子部门"},
+    {"uid": 5228596562, "screen_name": "天空守恒（核桃小喇叭）", "column": "网宣组", "role": "创作官"},
+    {"uid": 7767934805, "screen_name": "Dawn_冬安", "column": "前线/站姐", "role": "前线/站姐"},
+    {"uid": 7503034355, "screen_name": "张凌赫核桃种植园", "column": "数据组", "role": "数据粉头"},
+    {"uid": 2434586073, "screen_name": "Limerence", "column": "视频组", "role": "视频产出"},
+    {"uid": 1752063050, "screen_name": "MAMORU", "column": "前线/站姐", "role": "前线/站姐"}
+  ],
+  "removed": [
+    {"uid": 7503046873, "screen_name": "fanh_jinghuazu", "reason": "账号已注销/搜不到，weibo.get_feeds 返回空"}
+  ],
+  "notes": "白名单每隔 1-2 周用 limit=1 巡检，剔除死号。原 11 个 → 现 10 个。"
+}
